@@ -1,50 +1,42 @@
-const { writeFile, readFile, utils } = require("xlsx");
-const mapping = require("./mapping.json");
-const TestSpec = require("./TestSpec.json");
-var wb = readFile(
-  "M:\\my_apps\\JS_Workspace\\Testcases_gen\\System and Software Requirements and Structure_DAS_SUZ_02_YEA - ENG2 ENG3 ENG4 ENG5.xlsx"
-);
+const { Generate_TestSpec } = require("./Gen_TestSpec");
+const { Generate_Dxl } = require("./Gen_Dxl");
+const { IsDefined, GetAbsPath, getSysArgs } = require("./Func");
 
-let output = [];
+function Generate_func(args) {
+  let err = "";
+  let excel_config_path = "";
 
-function Update_content(data, req_info) {
-  let _regex = /\{\w+\}/g;
-  let patterns = data.match(_regex);
-  let temp_data = data;
-  if ((patterns || []).length > 0) {
-    patterns.forEach((element) => {
-      temp_data = temp_data.replace(element, req_info[mapping[element]]);
-    });
+  if (IsDefined(args["excel_config"])) {
+    [err, excel_config_path] = GetAbsPath(args["excel_config"]);
+  } else {
+    err += "Please define arg '--excel_config=...'\r\n";
   }
-  return temp_data;
+
+  if (err === "") {
+    try {
+      err += eval(args["func"])(excel_config_path);
+    } catch (e) {
+      err += e.stack;
+    }
+  }
+
+  return err;
 }
 
-function Init_content(TestSpec_keys) {
-  let args = [];
-  for (var i in TestSpec_keys) {
-    let element = TestSpec_keys[i];
-    args[element] = "x";
-  }
-  return args;
+const sys_args = getSysArgs();
+let _Is_gen_TestSpec = true;
+let err = "";
+
+if (Object.keys(sys_args).length === 1 && IsDefined(sys_args["help"])) {
+  console.log("\t--func={Function_to_call}");
+  console.log("\t--excel_config={Excel_config_path}");
 }
-var data = utils.sheet_to_json(wb.Sheets["System and Software Requirement"], {
-  blankrows: false,
-});
 
-let TestSpec_keys = Object.keys(TestSpec);
+if (IsDefined(sys_args["func"])) {
+  err += Generate_func(sys_args);
+} else {
+  err += "Please choose the func to use!!! (--func=...)\r\n";
+}
 
-output.push(Init_content(TestSpec_keys));
-
-data.forEach((el) => {
-  let args = [];
-  for (var i in TestSpec_keys) {
-    let element = TestSpec_keys[i];
-    args[element] = Update_content(TestSpec[element], el);
-  }
-  output.push(args);
-});
-let output_sheet = utils.json_to_sheet(output);
-let wb_out = utils.book_new();
-wb_out.SheetNames.push("Test spec");
-wb_out.Sheets["Test spec"] = output_sheet;
-writeFile(wb_out, "TestSpec_out.xls");
+if (err !== "") console.log(err);
+else console.log("Done!");
